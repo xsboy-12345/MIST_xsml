@@ -223,6 +223,7 @@ def main() -> None:
         logging_steps=cfg.get("logging_steps", 20),
         fp16=False,
         bf16=True,
+        gradient_checkpointing=cfg.get("gradient_checkpointing", True),
         seed=cfg.get("seed", 42),
         report_to="none",
         max_steps=2 if args.dry_run else -1,
