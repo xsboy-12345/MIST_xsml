@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+
+# 模型权重（体积太大）
+outputs/
+*.bin
+*.safetensors
+*.pt
+
+# 训练日志（可选择性保留）
+logs/
+
+# 可视化图片（可选）
+viz/figures/
+
+# 数据（raw 数据不上传，processed 可以上传）
+data/raw/
