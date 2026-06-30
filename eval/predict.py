@@ -85,7 +85,7 @@ def main() -> None:
             tokenize=False,
             add_generation_prompt=True,
         )
-        enc = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=1024)
+        enc = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512)
         enc = {k: v.to(model.device) for k, v in enc.items()}
 
         with torch.no_grad():
