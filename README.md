@@ -67,7 +67,8 @@ xlsum/
 ├── eval/
 │   ├── predict.py              # Run fine-tuned model on test set
 │   ├── compute_tau.py          # Compute τ and ranking accuracy vs human ratings
-│   └── compute_rouge.py        # ROUGE-1/2/L evaluation for generated summaries
+│   ├── compute_rouge.py        # ROUGE-1/2/L evaluation for generated summaries
+│   └── compute_bertscore.py    # BERTScore F1 (semantic similarity, multilingual)
 ├── viz/
 │   ├── editor.py               # PyQt6 GUI dataset browser & editor
 │   ├── plot_data.py            # EDA: score distributions, language heatmap
@@ -110,17 +111,26 @@ python train/train.py --config train/configs/llama_config.yaml --dry-run
 
 Training logs τ per epoch to `logs/{model}_tau_log.json` automatically.
 
-### 4. ROUGE evaluation (local, no GPU needed)
+### 4. Automatic evaluation (local, no GPU needed)
 
-Evaluates summary quality using the highest-rated model's output as pseudo-reference.
+Both metrics use the highest-rated model's output as pseudo-reference per task.
 
 ```bash
-pip install rouge-score
+pip install rouge-score bert-score
+
+# ROUGE-1/2/L (n-gram overlap)
 python eval/compute_rouge.py
 # → eval/outputs/rouge_report.json
+
+# BERTScore F1 (semantic similarity, multilingual BERT)
+python eval/compute_bertscore.py
+# → eval/outputs/bertscore_report.json
+
+# Use a single multilingual model across all languages (optional)
+python eval/compute_bertscore.py --model microsoft/mdeberta-v3-base
 ```
 
-Outputs: ROUGE-1/2/L averages overall, per language, per model, and Pearson correlation with human ratings.
+Both scripts output per-language, per-model averages and Pearson correlation with human ratings.
 
 ### 5. Judge evaluation (after training)
 
@@ -205,17 +215,17 @@ Reference (GPT-4.1 zero-shot, from WMT25-MIST):
 
 ### Summary quality
 - **ROUGE-1 / ROUGE-2 / ROUGE-L** — n-gram overlap with pseudo-reference (highest human-rated summary per task)
-- Pearson correlation between ROUGE scores and human ratings reported per language and per model
+- **BERTScore F1** — semantic similarity via multilingual BERT, more robust than ROUGE for multilingual settings
+- Pearson correlation between automatic scores and human ratings reported per language and per model
 
 ## Requirements
 
+**GPU server** (training):
+```bash
+pip install -r requirements.txt
 ```
-torch>=2.1.0
-transformers>=4.45.0
-peft>=0.12.0
-datasets>=2.20.0
-accelerate>=0.30.0
-bitsandbytes>=0.43.0
-pyyaml>=6.0
-matplotlib>=3.8.0  # local visualization only
+
+**Local machine** (evaluation, visualization, GUI):
+```bash
+pip install -r requirements-local.txt
 ```

@@ -1,4 +1,4 @@
-# GPU 服务器需要安装
+# GPU 服务器依赖（在远程服务器上安装）
 torch>=2.1.0
 transformers>=4.45.0
 peft>=0.12.0
@@ -8,8 +8,3 @@ accelerate>=0.30.0
 bitsandbytes>=0.43.0
 scipy>=1.11.0
 pyyaml>=6.0
-
-# 本地可视化（Mac 本地运行）
-matplotlib>=3.8.0
-numpy>=1.26.0
-seaborn>=0.13.0
