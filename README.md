@@ -35,6 +35,7 @@ Languages: Arabic, Czech, German, Spanish, French, Hindi, Indonesian, Italian, J
 xlsum/
 ├── data/
 │   ├── prepare.py              # Build train/dev/test from raw humeval data
+│   ├── raw/                    # xlsum_humeval.json (source data)
 │   └── processed/              # train.jsonl / dev.jsonl / test.jsonl
 ├── train/
 │   ├── train.py                # QLoRA fine-tuning (runs on GPU server)
@@ -43,8 +44,10 @@ xlsum/
 │       └── qwen_config.yaml    # Qwen2.5-7B-Instruct config
 ├── eval/
 │   ├── predict.py              # Run fine-tuned model on test set
-│   └── compute_tau.py          # Compute τ and ranking accuracy vs human ratings
+│   ├── compute_tau.py          # Compute τ and ranking accuracy vs human ratings
+│   └── compute_rouge.py        # ROUGE-1/2/L evaluation for generated summaries
 ├── viz/
+│   ├── editor.py               # PyQt6 GUI dataset browser & editor
 │   ├── plot_data.py            # EDA: score distributions, language heatmap
 │   └── plot_training.py        # Training curves, scatter plots, radar chart
 └── requirements.txt
@@ -85,24 +88,54 @@ python train/train.py --config train/configs/llama_config.yaml --dry-run
 
 Training logs τ per epoch to `logs/{model}_tau_log.json` automatically.
 
-### 4. Evaluate
+### 4. ROUGE evaluation (local, no GPU needed)
+
+Evaluates summary quality using the highest-rated model's output as pseudo-reference.
 
 ```bash
-python eval/predict.py --adapter outputs/llama/adapter_final --model-name llama-judge
-python eval/predict.py --adapter outputs/qwen/adapter_final  --model-name qwen-judge
-python eval/compute_tau.py --pred eval/outputs/llama-judge.json eval/outputs/qwen-judge.json
+pip install rouge-score
+python eval/compute_rouge.py
+# → eval/outputs/rouge_report.json
 ```
 
-### 5. Visualize results (local)
+Outputs: ROUGE-1/2/L averages overall, per language, per model, and Pearson correlation with human ratings.
+
+### 5. Judge evaluation (after training)
 
 ```bash
-# Pull results from server first
-rsync -av cqa1:~/xlsum/logs/      logs/
-rsync -av cqa1:~/xlsum/eval/outputs/ eval/outputs/
+# On GPU server: run inference with fine-tuned adapter
+python eval/predict.py --adapter outputs/qwen/adapter_final --model-name qwen-judge
+python eval/predict.py --adapter outputs/llama/adapter_final --model-name llama-judge
 
+# Compute τ and ranking accuracy vs human ratings
+python eval/compute_tau.py --pred eval/outputs/qwen-judge.json eval/outputs/llama-judge.json
+```
+
+### 6. Visualize results (local)
+
+```bash
+# Pull training logs and predictions from server
+rsync -av cqa1:~/MIST_xsml/logs/         logs/
+rsync -av cqa1:~/MIST_xsml/eval/outputs/ eval/outputs/
+
+# Training curves, scatter plots, radar chart
 python viz/plot_training.py
 # → viz/figures/training/
 ```
+
+### 7. Dataset browser (local)
+
+Interactive PyQt6 GUI to browse and filter training records by language, dimension, and score.
+
+```bash
+pip install PyQt6
+python viz/editor.py            # opens train split by default
+python viz/editor.py --split test
+```
+
+- Filter by language / dimension / minimum score
+- Browse reviews, generated summary, and human scores side by side
+- Export filtered subset to JSONL (Ctrl+E)
 
 ## Training Format
 
@@ -137,6 +170,7 @@ Both models use QLoRA (4-bit) + LoRA adapters:
 
 ## Evaluation Metrics
 
+### Judge quality
 - **Kendall's τ** per dimension and average — correlation with human scores
 - **Ranking accuracy** — pairwise ranking agreement across generator models
 
@@ -146,6 +180,10 @@ Reference (GPT-4.1 zero-shot, from WMT25-MIST):
 |--------|---------|
 | τ average | 0.020 |
 | Ranking accuracy | 1.000 |
+
+### Summary quality
+- **ROUGE-1 / ROUGE-2 / ROUGE-L** — n-gram overlap with pseudo-reference (highest human-rated summary per task)
+- Pearson correlation between ROUGE scores and human ratings reported per language and per model
 
 ## Requirements
 
