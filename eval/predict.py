@@ -104,6 +104,7 @@ def main() -> None:
         results.append({
             "taskid":      taskid,
             "answer":      pred_score,
+            "raw_output":  generated,
             "tokens":      {"input_tokens": enc["input_ids"].shape[1], "output_tokens": 1},
             # 额外保留便于 compute_tau 直接使用
             "_dimension":  meta["dimension"],
