@@ -12,8 +12,18 @@ eval/predict.py
 from __future__ import annotations
 import argparse, json, re, pathlib
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, LogitsProcessor
 from peft import PeftModel
+
+
+class DigitOnlyLogitsProcessor(LogitsProcessor):
+    def __init__(self, allowed_ids: list[int]):
+        self.allowed_ids = allowed_ids
+
+    def __call__(self, input_ids, scores):
+        mask = torch.full_like(scores, float("-inf"))
+        mask[:, self.allowed_ids] = 0
+        return scores + mask
 
 ROOT     = pathlib.Path(__file__).parent.parent
 DATA_DIR = ROOT / "data/processed"
@@ -97,7 +107,7 @@ def main() -> None:
                 max_new_tokens=1,
                 do_sample=False,
                 pad_token_id=tokenizer.eos_token_id,
-                force_words_ids=[allowed_ids],
+                logits_processor=[DigitOnlyLogitsProcessor(allowed_ids)],
             )
         generated = tokenizer.decode(out[0][enc["input_ids"].shape[1]:], skip_special_tokens=True)
         pred_score = parse_score(generated)
