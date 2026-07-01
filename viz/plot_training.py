@@ -152,24 +152,26 @@ def plot_score_dist_comparison(preds_map: dict[str, list[dict]]) -> None:
     fig, axes = plt.subplots(1, 4, figsize=(14, 4))
     x = np.arange(1, 8)
 
+    n_bars = 1 + len(preds_map)
+    bar_width = 0.7 / n_bars
+    offsets = np.linspace(-(n_bars - 1) / 2, (n_bars - 1) / 2, n_bars) * bar_width
+
     for ax, dim in zip(axes, DIMS):
-        # 人工分布（从第一个模型里取）
         first_preds = list(preds_map.values())[0]
         human_scores = [p["_human_score"] for p in first_preds if p["_dimension"] == dim]
         human_counts = np.array([human_scores.count(i) for i in range(1, 8)], dtype=float)
         if human_counts.sum() > 0:
             human_counts /= human_counts.sum()
-        ax.bar(x - 0.15, human_counts, width=0.28, label="Human", color="gray", alpha=0.7, edgecolor="white")
+        ax.bar(x + offsets[0], human_counts, width=bar_width, label="Human", color="gray", alpha=0.7, edgecolor="white")
 
-        for name, preds in preds_map.items():
+        for i, (name, preds) in enumerate(preds_map.items(), 1):
             valid = [p for p in preds if p["answer"] not in ("-1",) and p["_dimension"] == dim]
             pred_scores = [int(p["answer"]) for p in valid]
             pred_counts = np.array([pred_scores.count(i) for i in range(1, 8)], dtype=float)
             if pred_counts.sum() > 0:
                 pred_counts /= pred_counts.sum()
             color = COLORS.get(name.lower().split("-")[0], "#555")
-            offset = 0.15 * (list(preds_map).index(name) + 1)
-            ax.bar(x + offset, pred_counts, width=0.28, label=name, color=color, alpha=0.7, edgecolor="white")
+            ax.bar(x + offsets[i], pred_counts, width=bar_width, label=name, color=color, alpha=0.7, edgecolor="white")
 
         ax.set_title(dim.capitalize(), fontsize=11, fontweight="bold")
         ax.set_xlabel("Score")
