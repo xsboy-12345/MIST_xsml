@@ -70,6 +70,9 @@ def main() -> None:
     model = PeftModel.from_pretrained(base, str(adapter_path))
     model.eval()
 
+    # 只允许生成 1-7 的 token，避免模型用目标语言续写
+    allowed_ids = [tokenizer.encode(str(i), add_special_tokens=False)[0] for i in range(1, 8)]
+
     # ── 推理 ─────────────────────────────────────────────────────────────────
     records = load_jsonl(DATA_DIR / f"{args.split}.jsonl")
     if args.limit:
@@ -91,9 +94,10 @@ def main() -> None:
         with torch.no_grad():
             out = model.generate(
                 **enc,
-                max_new_tokens=4,
+                max_new_tokens=1,
                 do_sample=False,
                 pad_token_id=tokenizer.eos_token_id,
+                force_words_ids=[allowed_ids],
             )
         generated = tokenizer.decode(out[0][enc["input_ids"].shape[1]:], skip_special_tokens=True)
         pred_score = parse_score(generated)
