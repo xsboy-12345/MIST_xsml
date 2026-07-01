@@ -1,16 +1,30 @@
 [
   {
+    "model": "llama-judge",
+    "total": 1715,
+    "valid": 1339,
+    "parse_failures": 376,
+    "tau_average": 0.089152,
+    "tau_by_dim": {
+      "faithfulness": 0.06059,
+      "coverage": 0.130288,
+      "naturalness": 0.033879,
+      "coherence": 0.131851
+    },
+    "ranking_accuracy": 0.632353
+  },
+  {
     "model": "qwen-judge",
     "total": 1715,
-    "valid": 1285,
-    "parse_failures": 430,
-    "tau_average": 0.094643,
+    "valid": 149,
+    "parse_failures": 1566,
+    "tau_average": 0.162112,
     "tau_by_dim": {
-      "faithfulness": 0.107615,
-      "coverage": 0.101102,
-      "naturalness": 0.065455,
-      "coherence": 0.1044
+      "faithfulness": 0.207681,
+      "coverage": 0.14305,
+      "naturalness": 0.245411,
+      "coherence": 0.052308
     },
-    "ranking_accuracy": 0.772059
+    "ranking_accuracy": 0.661765
   }
 ]
