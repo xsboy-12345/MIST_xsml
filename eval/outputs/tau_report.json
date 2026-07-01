@@ -1,0 +1,16 @@
+[
+  {
+    "model": "qwen-judge",
+    "total": 1715,
+    "valid": 1285,
+    "parse_failures": 430,
+    "tau_average": 0.094643,
+    "tau_by_dim": {
+      "faithfulness": 0.107615,
+      "coverage": 0.101102,
+      "naturalness": 0.065455,
+      "coherence": 0.1044
+    },
+    "ranking_accuracy": 0.772059
+  }
+]
