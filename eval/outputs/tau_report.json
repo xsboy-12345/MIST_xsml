@@ -2,29 +2,29 @@
   {
     "model": "llama-judge",
     "total": 1715,
-    "valid": 1339,
-    "parse_failures": 376,
-    "tau_average": 0.089152,
+    "valid": 1715,
+    "parse_failures": 0,
+    "tau_average": 0.087698,
     "tau_by_dim": {
-      "faithfulness": 0.06059,
-      "coverage": 0.130288,
-      "naturalness": 0.033879,
-      "coherence": 0.131851
+      "faithfulness": 0.090937,
+      "coverage": 0.096104,
+      "naturalness": 0.044276,
+      "coherence": 0.119474
     },
-    "ranking_accuracy": 0.632353
+    "ranking_accuracy": 0.477941
   },
   {
     "model": "qwen-judge",
     "total": 1715,
-    "valid": 149,
-    "parse_failures": 1566,
-    "tau_average": 0.162112,
+    "valid": 1715,
+    "parse_failures": 0,
+    "tau_average": 0.07855,
     "tau_by_dim": {
-      "faithfulness": 0.207681,
-      "coverage": 0.14305,
-      "naturalness": 0.245411,
-      "coherence": 0.052308
+      "faithfulness": 0.072562,
+      "coverage": 0.037003,
+      "naturalness": 0.093017,
+      "coherence": 0.111617
     },
-    "ranking_accuracy": 0.661765
+    "ranking_accuracy": 0.801471
   }
 ]
