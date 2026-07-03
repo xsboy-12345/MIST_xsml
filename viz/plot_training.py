@@ -1,31 +1,66 @@
 """
 viz/plot_training.py
 
-可视化训练过程：
-  1. Tau 相关系数随 epoch 的变化（Llama vs Qwen）
-  2. 推理结果的预测分 vs 人工分散点图
-  3. 预测分数分布 vs 人工分布对比
-  4. 各维度 tau 雷达图
+可视化训练过程（支持 v1/v2 版本对比）：
+  1. Tau 相关系数随 epoch 的变化
+  2. 测试集 v1 vs v2 tau 对比柱状图
+  3. 推理结果的预测分 vs 人工分散点图
+  4. 预测分数分布 vs 人工分布对比
+  5. 各维度 tau 雷达图
 
 用法:
     python viz/plot_training.py
-    python viz/plot_training.py --tau-only   # 只画 tau 曲线
+    python viz/plot_training.py --tau-only
 """
 
 from __future__ import annotations
 import argparse, json, math, pathlib
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 import numpy as np
 
-ROOT    = pathlib.Path(__file__).parent.parent
-LOG_DIR = ROOT / "logs"
+ROOT     = pathlib.Path(__file__).parent.parent
+LOG_DIR  = ROOT / "logs"
 PRED_DIR = ROOT / "eval/outputs"
 FIG_DIR  = ROOT / "viz/figures/training"
 FIG_DIR.mkdir(parents=True, exist_ok=True)
 
-DIMS   = ["faithfulness", "coverage", "naturalness", "coherence"]
-COLORS = {"llama": "#4C72B0", "qwen": "#DD8452"}
+DIMS = ["faithfulness", "coverage", "naturalness", "coherence"]
+
+COLORS = {
+    "llama_v1":       "#A8C8E8",
+    "llama_v2":       "#4C72B0",
+    "qwen_v1":        "#F5C28A",
+    "qwen_v2":        "#DD8452",
+    "llama-judge-v1": "#A8C8E8",
+    "llama-judge-v2": "#4C72B0",
+    "qwen-judge-v1":  "#F5C28A",
+    "qwen-judge-v2":  "#DD8452",
+}
+
+LABELS = {
+    "llama_v1":       "Llama v1",
+    "llama_v2":       "Llama v2",
+    "qwen_v1":        "Qwen v1",
+    "qwen_v2":        "Qwen v2",
+    "llama-judge-v1": "Llama v1",
+    "llama-judge-v2": "Llama v2",
+    "qwen-judge-v1":  "Qwen v1",
+    "qwen-judge-v2":  "Qwen v2",
+}
+
+LINESTYLES = {"v1": "--", "v2": "-"}
+
+
+def get_color(name: str) -> str:
+    return COLORS.get(name, "#555555")
+
+
+def get_label(name: str) -> str:
+    return LABELS.get(name, name)
+
+
+def get_linestyle(name: str) -> str:
+    return LINESTYLES["v1"] if "v1" in name else LINESTYLES["v2"]
 
 
 def load_tau_log(name: str) -> list[dict] | None:
@@ -44,18 +79,17 @@ def load_predictions(name: str) -> list[dict] | None:
         return json.load(f)
 
 
-# ── 1. Tau 曲线 ──────────────────────────────────────────────────────────────
+# ── 1. Tau 训练曲线 ───────────────────────────────────────────────────────────
 
 def plot_tau_curves(logs: dict[str, list[dict]]) -> None:
-    fig, axes = plt.subplots(1, 2, figsize=(13, 5))
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
-    # 左：平均 tau
     ax = axes[0]
     for name, log in logs.items():
         epochs = [e["epoch"] for e in log]
         taus   = [e.get("tau_average", float("nan")) for e in log]
-        color  = COLORS.get(name.lower().split("-")[0], None)
-        ax.plot(epochs, taus, marker="o", label=name, color=color, linewidth=2)
+        ax.plot(epochs, taus, marker="o", label=get_label(name),
+                color=get_color(name), linestyle=get_linestyle(name), linewidth=2)
     ax.set_xlabel("Epoch")
     ax.set_ylabel("Kendall's τ (average)")
     ax.set_title("Average Tau vs. Epoch", fontsize=12, fontweight="bold")
@@ -63,17 +97,16 @@ def plot_tau_curves(logs: dict[str, list[dict]]) -> None:
     ax.grid(alpha=0.3)
     ax.axhline(0, color="gray", linestyle="--", linewidth=0.8)
 
-    # 右：各维度 tau（最后一个 epoch）
     ax = axes[1]
     x = np.arange(len(DIMS))
-    width = 0.35
+    n = len(logs)
+    width = 0.7 / n
+    offsets = np.linspace(-(n - 1) / 2, (n - 1) / 2, n) * width
     for i, (name, log) in enumerate(logs.items()):
         last = log[-1]
-        vals = [last.get(f"tau_{d}", last.get(d, float("nan"))) for d in DIMS]
-        color = COLORS.get(name.lower().split("-")[0], None)
-        offset = (i - (len(logs) - 1) / 2) * width
-        ax.bar(x + offset, vals, width, label=name, color=color, alpha=0.85, edgecolor="white")
-
+        vals = [last.get(d, float("nan")) for d in DIMS]
+        ax.bar(x + offsets[i], vals, width, label=get_label(name),
+               color=get_color(name), alpha=0.85, edgecolor="white")
     ax.set_xticks(x)
     ax.set_xticklabels([d.capitalize() for d in DIMS])
     ax.set_ylabel("Kendall's τ")
@@ -90,7 +123,59 @@ def plot_tau_curves(logs: dict[str, list[dict]]) -> None:
     print(f"保存: {path}")
 
 
-# ── 2. 预测分 vs 人工分散点图 ─────────────────────────────────────────────────
+# ── 2. 测试集 v1 vs v2 对比 ──────────────────────────────────────────────────
+
+def plot_version_comparison(reports: list[dict]) -> None:
+    metrics = DIMS + ["tau_average"]
+    metric_labels = [d.capitalize() for d in DIMS] + ["Average"]
+    x = np.arange(len(metrics))
+    n = len(reports)
+    width = 0.7 / n
+    offsets = np.linspace(-(n - 1) / 2, (n - 1) / 2, n) * width
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+    # 左：tau 各维度
+    ax = axes[0]
+    for i, report in enumerate(reports):
+        name = report["model"]
+        vals = [report["tau_by_dim"].get(d, 0) for d in DIMS] + [report["tau_average"]]
+        ax.bar(x + offsets[i], vals, width, label=get_label(name),
+               color=get_color(name), alpha=0.85, edgecolor="white")
+    ax.set_xticks(x)
+    ax.set_xticklabels(metric_labels)
+    ax.set_ylabel("Kendall's τ")
+    ax.set_title("Test Tau: v1 vs v2", fontsize=12, fontweight="bold")
+    ax.legend()
+    ax.grid(axis="y", alpha=0.3)
+    ax.axhline(0, color="gray", linestyle="--", linewidth=0.8)
+
+    # 右：ranking accuracy
+    ax = axes[1]
+    names  = [get_label(r["model"]) for r in reports]
+    accs   = [r["ranking_accuracy"] for r in reports]
+    colors = [get_color(r["model"]) for r in reports]
+    bars = ax.bar(names, accs, color=colors, alpha=0.85, edgecolor="white")
+    for bar, acc in zip(bars, accs):
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.01,
+                f"{acc:.3f}", ha="center", va="bottom", fontsize=10)
+    ax.axhline(0.5, color="gray", linestyle="--", linewidth=0.8, label="Random (0.5)")
+    ax.set_ylabel("Ranking Accuracy")
+    ax.set_title("Ranking Accuracy: v1 vs v2", fontsize=12, fontweight="bold")
+    ax.set_ylim(0, 1)
+    ax.legend()
+    ax.grid(axis="y", alpha=0.3)
+
+    fig.suptitle("Test Set Performance: Before vs After Hyperparameter Tuning",
+                 fontsize=13, fontweight="bold")
+    plt.tight_layout()
+    path = FIG_DIR / "version_comparison.png"
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"保存: {path}")
+
+
+# ── 3. 预测分 vs 人工分散点图 ─────────────────────────────────────────────────
 
 def plot_scatter(preds_map: dict[str, list[dict]]) -> None:
     n_models = len(preds_map)
@@ -104,26 +189,24 @@ def plot_scatter(preds_map: dict[str, list[dict]]) -> None:
             ax = axes[row, col]
             dim_preds = [p for p in valid if p["_dimension"] == dim]
             xs = [p["_human_score"] for p in dim_preds]
-            ys = [int(p["answer"])  for p in dim_preds]
+            ys = [int(p["answer"]) for p in dim_preds]
 
-            # 抖动避免重叠
             rng = np.random.default_rng(42)
             xs_j = np.array(xs) + rng.uniform(-0.2, 0.2, len(xs))
             ys_j = np.array(ys) + rng.uniform(-0.2, 0.2, len(ys))
 
-            color = COLORS.get(name.lower().split("-")[0], "#555")
-            ax.scatter(xs_j, ys_j, alpha=0.3, s=15, color=color)
+            ax.scatter(xs_j, ys_j, alpha=0.3, s=15, color=get_color(name))
             ax.plot([1, 7], [1, 7], "k--", linewidth=0.8, alpha=0.5)
             ax.set_xlim(0.5, 7.5)
             ax.set_ylim(0.5, 7.5)
             ax.set_xlabel("Human Score")
             ax.set_ylabel("Predicted Score")
-            ax.set_title(f"{name} — {dim.capitalize()}", fontsize=10)
+            ax.set_title(f"{get_label(name)} — {dim.capitalize()}", fontsize=10)
 
             if xs:
                 tau = _tau(xs, ys)
-                ax.text(0.05, 0.92, f"τ={tau:.3f}", transform=ax.transAxes, fontsize=9,
-                        verticalalignment="top", color="darkred")
+                ax.text(0.05, 0.92, f"τ={tau:.3f}", transform=ax.transAxes,
+                        fontsize=9, verticalalignment="top", color="darkred")
 
     fig.suptitle("Predicted vs. Human Scores", fontsize=13, fontweight="bold")
     plt.tight_layout()
@@ -146,12 +229,11 @@ def _tau(xs, ys) -> float:
     return (c - d) / denom if denom else float("nan")
 
 
-# ── 3. 分数分布对比 ───────────────────────────────────────────────────────────
+# ── 4. 分数分布对比 ───────────────────────────────────────────────────────────
 
 def plot_score_dist_comparison(preds_map: dict[str, list[dict]]) -> None:
     fig, axes = plt.subplots(1, 4, figsize=(14, 4))
     x = np.arange(1, 8)
-
     n_bars = 1 + len(preds_map)
     bar_width = 0.7 / n_bars
     offsets = np.linspace(-(n_bars - 1) / 2, (n_bars - 1) / 2, n_bars) * bar_width
@@ -162,22 +244,23 @@ def plot_score_dist_comparison(preds_map: dict[str, list[dict]]) -> None:
         human_counts = np.array([human_scores.count(i) for i in range(1, 8)], dtype=float)
         if human_counts.sum() > 0:
             human_counts /= human_counts.sum()
-        ax.bar(x + offsets[0], human_counts, width=bar_width, label="Human", color="gray", alpha=0.7, edgecolor="white")
+        ax.bar(x + offsets[0], human_counts, width=bar_width,
+               label="Human", color="gray", alpha=0.7, edgecolor="white")
 
-        for i, (name, preds) in enumerate(preds_map.items(), 1):
+        for idx, (name, preds) in enumerate(preds_map.items(), 1):
             valid = [p for p in preds if p["answer"] not in ("-1",) and p["_dimension"] == dim]
             pred_scores = [int(p["answer"]) for p in valid]
             pred_counts = np.array([pred_scores.count(i) for i in range(1, 8)], dtype=float)
             if pred_counts.sum() > 0:
                 pred_counts /= pred_counts.sum()
-            color = COLORS.get(name.lower().split("-")[0], "#555")
-            ax.bar(x + offsets[i], pred_counts, width=bar_width, label=name, color=color, alpha=0.7, edgecolor="white")
+            ax.bar(x + offsets[idx], pred_counts, width=bar_width,
+                   label=get_label(name), color=get_color(name), alpha=0.7, edgecolor="white")
 
         ax.set_title(dim.capitalize(), fontsize=11, fontweight="bold")
         ax.set_xlabel("Score")
         ax.set_ylabel("Proportion")
         ax.set_xticks(range(1, 8))
-        ax.legend(fontsize=8)
+        ax.legend(fontsize=7)
 
     fig.suptitle("Score Distribution: Predicted vs. Human", fontsize=13, fontweight="bold")
     plt.tight_layout()
@@ -187,7 +270,7 @@ def plot_score_dist_comparison(preds_map: dict[str, list[dict]]) -> None:
     print(f"保存: {path}")
 
 
-# ── 4. 雷达图 ─────────────────────────────────────────────────────────────────
+# ── 5. 雷达图 ─────────────────────────────────────────────────────────────────
 
 def plot_radar(tau_reports: list[dict]) -> None:
     categories = [d.capitalize() for d in DIMS]
@@ -195,21 +278,22 @@ def plot_radar(tau_reports: list[dict]) -> None:
     angles = [n / float(N) * 2 * math.pi for n in range(N)]
     angles += angles[:1]
 
-    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw={"polar": True})
+    fig, ax = plt.subplots(figsize=(7, 7), subplot_kw={"polar": True})
 
     for report in tau_reports:
         name   = report.get("model", "?")
         values = [report["tau_by_dim"].get(d, 0) for d in DIMS]
         values += values[:1]
-        color  = COLORS.get(name.lower().split("-")[0], None)
-        ax.plot(angles, values, linewidth=2, label=name, color=color)
-        ax.fill(angles, values, alpha=0.1, color=color)
+        ls = get_linestyle(name)
+        ax.plot(angles, values, linewidth=2, label=get_label(name),
+                color=get_color(name), linestyle=ls)
+        ax.fill(angles, values, alpha=0.08, color=get_color(name))
 
     ax.set_xticks(angles[:-1])
     ax.set_xticklabels(categories, fontsize=11)
-    ax.set_ylim(-0.5, 0.5)
+    ax.set_ylim(-0.1, 0.35)
     ax.set_title("Per-Dimension Tau — Radar", fontsize=12, fontweight="bold", pad=15)
-    ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.1))
+    ax.legend(loc="upper right", bbox_to_anchor=(1.35, 1.15))
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
@@ -226,9 +310,9 @@ def main() -> None:
     parser.add_argument("--tau-only", action="store_true")
     args = parser.parse_args()
 
-    # tau 曲线
+    # tau 训练曲线
     tau_logs = {}
-    for name in ("llama", "qwen"):
+    for name in ("llama_v1", "llama_v2", "qwen_v1", "qwen_v2"):
         log = load_tau_log(name)
         if log:
             tau_logs[name] = log
@@ -236,14 +320,14 @@ def main() -> None:
     if tau_logs:
         plot_tau_curves(tau_logs)
     else:
-        print("未找到 tau log（训练完成后再运行）")
+        print("未找到 tau log")
 
     if args.tau_only:
         return
 
     # 推理结果可视化
     preds_map: dict[str, list[dict]] = {}
-    for name in ("llama-judge", "qwen-judge"):
+    for name in ("llama-judge-v1", "llama-judge-v2", "qwen-judge-v1", "qwen-judge-v2"):
         preds = load_predictions(name)
         if preds:
             preds_map[name] = preds
@@ -252,12 +336,14 @@ def main() -> None:
         plot_scatter(preds_map)
         plot_score_dist_comparison(preds_map)
 
-    # tau 雷达图
+    # tau 报告（version comparison + radar）
     tau_report_path = PRED_DIR / "tau_report.json"
     if tau_report_path.exists():
         with open(tau_report_path) as f:
             reports = json.load(f)
-        plot_radar(reports)
+        if reports:
+            plot_version_comparison(reports)
+            plot_radar(reports)
 
     if not tau_logs and not preds_map:
         print("没有可用数据。请先完成训练和推理。")
