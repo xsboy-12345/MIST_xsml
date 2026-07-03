@@ -2,9 +2,9 @@
 train/train.py
 
 LoRA / QLoRA fine-tuning for LLM-as-judge on xlsum task.
-在 GPU 服务器上运行。
+Run on a GPU server.
 
-用法:
+Usage:
     python train/train.py --config train/configs/qwen_config.yaml
     python train/train.py --config train/configs/llama_config.yaml
     python train/train.py --config train/configs/qwen_config.yaml --dry-run
@@ -33,7 +33,7 @@ DATA_DIR = ROOT / "data/processed"
 LOG_DIR  = ROOT / "logs"
 
 
-# ── 数据加载 ──────────────────────────────────────────────────────────────────
+# ── Data loading ──────────────────────────────────────────────────────────────
 
 def load_jsonl(path: pathlib.Path) -> list[dict]:
     with open(path, encoding="utf-8") as f:
@@ -50,7 +50,7 @@ def apply_chat_template(example: dict, tokenizer) -> dict:
 
 
 def tokenize_fn(example: dict, tokenizer, max_len: int) -> dict:
-    """只对 assistant 部分计算 loss。"""
+    """Compute loss only on the assistant response tokens."""
     full = tokenizer(
         example["text"],
         truncation=True,
@@ -75,7 +75,7 @@ def tokenize_fn(example: dict, tokenizer, max_len: int) -> dict:
     }
 
 
-# ── Tau 评估 ──────────────────────────────────────────────────────────────────
+# ── Tau evaluation ────────────────────────────────────────────────────────────
 
 def parse_score(text: str) -> int | None:
     text = text.strip()
@@ -134,7 +134,7 @@ def evaluate_tau(model, tokenizer, records: list[dict], max_len: int) -> dict:
     return taus
 
 
-# ── Callback：每个 epoch 结束后算 tau ────────────────────────────────────────
+# ── Callback: compute tau on dev set at the end of each epoch ─────────────────
 
 class TauCallback(TrainerCallback):
     def __init__(self, tokenizer, dev_records: list[dict], max_len: int,
@@ -148,7 +148,7 @@ class TauCallback(TrainerCallback):
     def on_epoch_end(self, args, state: TrainerState,
                      control: TrainerControl, model=None, **kwargs):
         epoch = round(state.epoch or 0)
-        print(f"\n[Epoch {epoch}] 计算 dev tau...")
+        print(f"\n[Epoch {epoch}] Computing dev tau...")
         taus = evaluate_tau(model, self._tokenizer,
                             self._dev_records, self._max_len)
         entry = {"epoch": epoch, **taus}
@@ -162,13 +162,13 @@ class TauCallback(TrainerCallback):
             json.dump(self._history, f, indent=2)
 
 
-# ── 主流程 ────────────────────────────────────────────────────────────────────
+# ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
     parser.add_argument("--dry-run", action="store_true",
-                        help="只跑 2 steps 验证流程")
+                        help="Run only 2 steps to verify the pipeline")
     args = parser.parse_args()
 
     with open(args.config) as f:
@@ -180,12 +180,12 @@ def main() -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # ── tokenizer ─────────────────────────────────────────────────────────────
+    # ── Tokenizer ─────────────────────────────────────────────────────────────
     tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    # ── model (QLoRA) ─────────────────────────────────────────────────────────
+    # ── Model (QLoRA) ─────────────────────────────────────────────────────────
     bnb_cfg = None
     if cfg.get("use_4bit", False):
         bnb_cfg = BitsAndBytesConfig(
@@ -217,7 +217,7 @@ def main() -> None:
     model = get_peft_model(model, lora_cfg)
     model.print_trainable_parameters()
 
-    # ── dataset ───────────────────────────────────────────────────────────────
+    # ── Dataset ───────────────────────────────────────────────────────────────
     train_records = load_jsonl(DATA_DIR / "train.jsonl")
     dev_records   = load_jsonl(DATA_DIR / "dev.jsonl")
 
@@ -238,7 +238,7 @@ def main() -> None:
     train_ds = prepare(train_records)
     dev_ds   = prepare(dev_records)
 
-    # ── training args ─────────────────────────────────────────────────────────
+    # ── Training arguments ────────────────────────────────────────────────────
     model_short = pathlib.Path(cfg["output_dir"]).name
     log_path    = LOG_DIR / f"{model_short}_tau_log.json"
 
@@ -282,14 +282,14 @@ def main() -> None:
         callbacks=[tau_cb],
     )
 
-    # ── 单次调用，Trainer 内部处理所有 epoch ──────────────────────────────────
+    # Single call — Trainer handles all epochs internally
     trainer.train()
 
-    # 保存最终 adapter
+    # Save final adapter
     model.save_pretrained(str(out_dir / "adapter_final"))
     tokenizer.save_pretrained(str(out_dir / "adapter_final"))
-    print(f"\n模型已保存: {out_dir}/adapter_final")
-    print(f"Tau 日志:   {log_path}")
+    print(f"\nModel saved: {out_dir}/adapter_final")
+    print(f"Tau log:     {log_path}")
 
 
 if __name__ == "__main__":
