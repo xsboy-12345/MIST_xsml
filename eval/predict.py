@@ -118,7 +118,7 @@ def main() -> None:
         results.append({
             "taskid":      taskid,
             "answer":      pred_score,
-            "raw_output":  generated,
+            # "raw_output": generated,  # 调试用：保存模型原始输出，用于分析解析失败原因
             "tokens":      {"input_tokens": enc["input_ids"].shape[1], "output_tokens": 1},
             # 额外保留便于 compute_tau 直接使用
             "_dimension":  meta["dimension"],
