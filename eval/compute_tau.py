@@ -71,7 +71,7 @@ def compute_report(preds: list[dict], model_name: str) -> dict:
     valid_taus = [v for v in tau_by_dim.values() if not math.isnan(v)]
     tau_avg = round(sum(valid_taus) / len(valid_taus), 6) if valid_taus else float("nan")
 
-    # ranking_accuracy: 按 gen_model 聚合平均分
+    # ranking_accuracy: aggregate average scores per gen_model
     pred_per_genmodel:  dict[str, list[int]] = defaultdict(list)
     human_per_genmodel: dict[str, list[int]] = defaultdict(list)
     for p in valid:
@@ -98,7 +98,7 @@ def compute_report(preds: list[dict], model_name: str) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--pred", nargs="+", required=True, help="predict.py 输出的 JSON 文件")
+    parser.add_argument("--pred", nargs="+", required=True, help="JSON output files from predict.py")
     args = parser.parse_args()
 
     all_reports: list[dict] = []
@@ -110,9 +110,9 @@ def main() -> None:
         all_reports.append(report)
 
         print(f"\n=== {model_name} ===")
-        print(f"  有效条数:       {report['valid']} / {report['total']}")
-        print(f"  解析失败:       {report['parse_failures']}")
-        print(f"  tau_average:    {report['tau_average']:.4f}")
+        print(f"  valid:            {report['valid']} / {report['total']}")
+        print(f"  parse_failures:   {report['parse_failures']}")
+        print(f"  tau_average:      {report['tau_average']:.4f}")
         for dim, tau in report["tau_by_dim"].items():
             print(f"    {dim:15s}: {tau:.4f}")
         print(f"  ranking_accuracy: {report['ranking_accuracy']:.4f}")
@@ -120,7 +120,7 @@ def main() -> None:
     out_path = OUT_DIR / "tau_report.json"
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(all_reports, f, ensure_ascii=False, indent=2)
-    print(f"\n报告写入: {out_path}")
+    print(f"\nReport written to: {out_path}")
 
 
 if __name__ == "__main__":

@@ -1,10 +1,10 @@
 """
 eval/predict.py
 
-用训练好的 LoRA adapter 在 test.jsonl 上推理，输出预测分数。
-同时以 submissions_judge_xlsum 兼容格式输出（可直接送 compute_tau）。
+Run inference with a trained LoRA adapter on test.jsonl and output predicted scores.
+Output format is compatible with submissions_judge_xlsum (can be fed directly to compute_tau).
 
-用法:
+Usage:
     python eval/predict.py --adapter outputs/llama/adapter_final --model-name llama-judge
     python eval/predict.py --adapter outputs/qwen/adapter_final  --model-name qwen-judge
 """
@@ -31,7 +31,7 @@ OUT_DIR  = ROOT / "eval/outputs"
 
 
 def parse_score(text: str) -> str:
-    """返回 '1'–'7' 字符串，解析不到则返回 '-1'。"""
+    """Return a score string '1'–'7', or '-1' if parsing fails."""
     text = text.strip()
     if re.fullmatch(r"[1-7]", text):
         return text
@@ -46,16 +46,16 @@ def load_jsonl(path: pathlib.Path) -> list[dict]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--adapter",    required=True, help="adapter 目录，包含 adapter_config.json")
-    parser.add_argument("--model-name", required=True, help="输出文件名（无扩展名）")
+    parser.add_argument("--adapter",    required=True, help="adapter directory containing adapter_config.json")
+    parser.add_argument("--model-name", required=True, help="output filename (without extension)")
     parser.add_argument("--split",      default="test", choices=["dev", "test"])
-    parser.add_argument("--limit",      type=int, default=None, help="只推理前 N 条（调试）")
+    parser.add_argument("--limit",      type=int, default=None, help="only run inference on first N samples (for debugging)")
     parser.add_argument("--use-4bit",   action="store_true")
     args = parser.parse_args()
 
     adapter_path = pathlib.Path(args.adapter)
 
-    # ── 加载 tokenizer + base model + adapter ────────────────────────────────
+    # ── Load tokenizer + base model + adapter ────────────────────────────────
     tokenizer = AutoTokenizer.from_pretrained(adapter_path, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -80,10 +80,10 @@ def main() -> None:
     model = PeftModel.from_pretrained(base, str(adapter_path))
     model.eval()
 
-    # 只允许生成 1-7 的 token，避免模型用目标语言续写
+    # Restrict generation to digit tokens 1-7 to prevent the model from continuing in the input language
     allowed_ids = [tokenizer.encode(str(i), add_special_tokens=False)[0] for i in range(1, 8)]
 
-    # ── 推理 ─────────────────────────────────────────────────────────────────
+    # ── Inference ─────────────────────────────────────────────────────────────
     records = load_jsonl(DATA_DIR / f"{args.split}.jsonl")
     if args.limit:
         records = records[: args.limit]
@@ -113,14 +113,14 @@ def main() -> None:
         pred_score = parse_score(generated)
 
         meta = rec["meta"]
-        # submissions_judge_xlsum 兼容格式
+        # submissions_judge_xlsum compatible format
         taskid = f"judge_{meta['dimension']}_{meta['taskid']}_{meta['gen_model']}"
         results.append({
             "taskid":      taskid,
             "answer":      pred_score,
-            # "raw_output": generated,  # 调试用：保存模型原始输出，用于分析解析失败原因
+            # "raw_output": generated,  # debug: save raw model output to diagnose parse failures
             "tokens":      {"input_tokens": enc["input_ids"].shape[1], "output_tokens": 1},
-            # 额外保留便于 compute_tau 直接使用
+            # extra fields for compute_tau
             "_dimension":  meta["dimension"],
             "_language":   meta["language"],
             "_gen_model":  meta["gen_model"],
@@ -134,8 +134,8 @@ def main() -> None:
 
     total   = len(results)
     invalid = sum(1 for r in results if r["answer"] == "-1")
-    print(f"\n推理完成: {total} 条，解析失败: {invalid} 条")
-    print(f"输出: {out_path}")
+    print(f"\nInference complete: {total} samples, parse failures: {invalid}")
+    print(f"Output: {out_path}")
 
 
 if __name__ == "__main__":
