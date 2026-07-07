@@ -1,7 +1,7 @@
 # Llama-3.1-8B-Instruct LoRA judge fine-tuning config
 
 model_name: "meta-llama/Llama-3.1-8B-Instruct"
-output_dir: "outputs/llama"
+output_dir: "outputs/llama_v3"
 
 # LoRA
 lora_r: 32
@@ -41,5 +41,5 @@ metric_for_best_model: "tau_average"
 
 # Logging
 logging_steps: 20
-report_to: "none"          # 换成 "wandb" 可接 wandb
+report_to: "none"
 seed: 42

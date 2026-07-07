@@ -29,12 +29,16 @@ DIMS = ["faithfulness", "coverage", "naturalness", "coherence"]
 COLORS = {
     "llama_v1":        "#A8C8E8",
     "llama_v2":        "#4C72B0",
+    "llama_v3":        "#1A3A6B",
     "qwen_v1":         "#F5C28A",
     "qwen_v2":         "#DD8452",
+    "qwen_v3":         "#8B3A0F",
     "llama-judge-v1":  "#A8C8E8",
     "llama-judge-v2":  "#4C72B0",
+    "llama-judge-v3":  "#1A3A6B",
     "qwen-judge-v1":   "#F5C28A",
     "qwen-judge-v2":   "#DD8452",
+    "qwen-judge-v3":   "#8B3A0F",
     "llama-zero-shot": "#B0B8C0",
     "qwen-zero-shot":  "#C8B8A0",
 }
@@ -42,17 +46,21 @@ COLORS = {
 LABELS = {
     "llama_v1":        "Llama v1",
     "llama_v2":        "Llama v2",
+    "llama_v3":        "Llama v3",
     "qwen_v1":         "Qwen v1",
     "qwen_v2":         "Qwen v2",
+    "qwen_v3":         "Qwen v3",
     "llama-judge-v1":  "Llama v1",
     "llama-judge-v2":  "Llama v2",
+    "llama-judge-v3":  "Llama v3",
     "qwen-judge-v1":   "Qwen v1",
     "qwen-judge-v2":   "Qwen v2",
+    "qwen-judge-v3":   "Qwen v3",
     "llama-zero-shot": "Llama Zero-shot",
     "qwen-zero-shot":  "Qwen Zero-shot",
 }
 
-LINESTYLES = {"v1": "--", "v2": "-", "zero": ":"}
+LINESTYLES = {"v1": "--", "v2": "-", "v3": "-.", "zero": ":"}
 
 
 def get_color(name: str) -> str:
@@ -65,6 +73,7 @@ def get_label(name: str) -> str:
 
 def get_linestyle(name: str) -> str:
     if "zero" in name:  return LINESTYLES["zero"]
+    if "v3"   in name:  return LINESTYLES["v3"]
     if "v1"   in name:  return LINESTYLES["v1"]
     return LINESTYLES["v2"]
 
@@ -318,7 +327,7 @@ def main() -> None:
 
     # tau training curves
     tau_logs = {}
-    for name in ("llama_v1", "llama_v2", "qwen_v1", "qwen_v2"):
+    for name in ("llama_v1", "llama_v2", "llama_v3", "qwen_v1", "qwen_v2", "qwen_v3"):
         log = load_tau_log(name)
         if log:
             tau_logs[name] = log
@@ -333,8 +342,8 @@ def main() -> None:
 
     # inference result visualizations
     preds_map: dict[str, list[dict]] = {}
-    for name in ("llama-zero-shot", "llama-judge-v1", "llama-judge-v2",
-                 "qwen-zero-shot",  "qwen-judge-v1",  "qwen-judge-v2"):
+    for name in ("llama-zero-shot", "llama-judge-v1", "llama-judge-v2", "llama-judge-v3",
+                 "qwen-zero-shot",  "qwen-judge-v1",  "qwen-judge-v2",  "qwen-judge-v3"):
         preds = load_predictions(name)
         if preds:
             preds_map[name] = preds

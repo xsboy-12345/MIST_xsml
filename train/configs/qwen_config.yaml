@@ -1,7 +1,7 @@
 # Qwen2.5-7B-Instruct LoRA judge fine-tuning config
 
 model_name: "Qwen/Qwen2.5-7B-Instruct"
-output_dir: "outputs/qwen"
+output_dir: "outputs/qwen_v3"
 
 # LoRA
 lora_r: 16
