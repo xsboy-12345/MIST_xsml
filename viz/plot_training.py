@@ -27,28 +27,32 @@ FIG_DIR.mkdir(parents=True, exist_ok=True)
 DIMS = ["faithfulness", "coverage", "naturalness", "coherence"]
 
 COLORS = {
-    "llama_v1":       "#A8C8E8",
-    "llama_v2":       "#4C72B0",
-    "qwen_v1":        "#F5C28A",
-    "qwen_v2":        "#DD8452",
-    "llama-judge-v1": "#A8C8E8",
-    "llama-judge-v2": "#4C72B0",
-    "qwen-judge-v1":  "#F5C28A",
-    "qwen-judge-v2":  "#DD8452",
+    "llama_v1":        "#A8C8E8",
+    "llama_v2":        "#4C72B0",
+    "qwen_v1":         "#F5C28A",
+    "qwen_v2":         "#DD8452",
+    "llama-judge-v1":  "#A8C8E8",
+    "llama-judge-v2":  "#4C72B0",
+    "qwen-judge-v1":   "#F5C28A",
+    "qwen-judge-v2":   "#DD8452",
+    "llama-zero-shot": "#B0B8C0",
+    "qwen-zero-shot":  "#C8B8A0",
 }
 
 LABELS = {
-    "llama_v1":       "Llama v1",
-    "llama_v2":       "Llama v2",
-    "qwen_v1":        "Qwen v1",
-    "qwen_v2":        "Qwen v2",
-    "llama-judge-v1": "Llama v1",
-    "llama-judge-v2": "Llama v2",
-    "qwen-judge-v1":  "Qwen v1",
-    "qwen-judge-v2":  "Qwen v2",
+    "llama_v1":        "Llama v1",
+    "llama_v2":        "Llama v2",
+    "qwen_v1":         "Qwen v1",
+    "qwen_v2":         "Qwen v2",
+    "llama-judge-v1":  "Llama v1",
+    "llama-judge-v2":  "Llama v2",
+    "qwen-judge-v1":   "Qwen v1",
+    "qwen-judge-v2":   "Qwen v2",
+    "llama-zero-shot": "Llama Zero-shot",
+    "qwen-zero-shot":  "Qwen Zero-shot",
 }
 
-LINESTYLES = {"v1": "--", "v2": "-"}
+LINESTYLES = {"v1": "--", "v2": "-", "zero": ":"}
 
 
 def get_color(name: str) -> str:
@@ -60,7 +64,9 @@ def get_label(name: str) -> str:
 
 
 def get_linestyle(name: str) -> str:
-    return LINESTYLES["v1"] if "v1" in name else LINESTYLES["v2"]
+    if "zero" in name:  return LINESTYLES["zero"]
+    if "v1"   in name:  return LINESTYLES["v1"]
+    return LINESTYLES["v2"]
 
 
 def load_tau_log(name: str) -> list[dict] | None:
@@ -327,7 +333,8 @@ def main() -> None:
 
     # 推理结果可视化
     preds_map: dict[str, list[dict]] = {}
-    for name in ("llama-judge-v1", "llama-judge-v2", "qwen-judge-v1", "qwen-judge-v2"):
+    for name in ("llama-zero-shot", "llama-judge-v1", "llama-judge-v2",
+                 "qwen-zero-shot",  "qwen-judge-v1",  "qwen-judge-v2"):
         preds = load_predictions(name)
         if preds:
             preds_map[name] = preds
