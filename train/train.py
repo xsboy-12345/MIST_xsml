@@ -25,10 +25,22 @@ from transformers import (
     TrainerState,
     DataCollatorForSeq2Seq,
     BitsAndBytesConfig,
+    LogitsProcessor,
 )
 from peft import LoraConfig, get_peft_model, TaskType
 
 ROOT     = pathlib.Path(__file__).parent.parent
+
+
+class DigitOnlyLogitsProcessor(LogitsProcessor):
+    """Restrict generation to digit tokens 1–7, matching predict.py inference."""
+    def __init__(self, allowed_ids: list[int]):
+        self.allowed_ids = allowed_ids
+
+    def __call__(self, input_ids, scores):
+        mask = torch.full_like(scores, float("-inf"))
+        mask[:, self.allowed_ids] = 0
+        return scores + mask
 DATA_DIR = ROOT / "data/processed"
 LOG_DIR  = ROOT / "logs"
 
@@ -106,6 +118,9 @@ def evaluate_tau(model, tokenizer, records: list[dict], max_len: int) -> dict:
     preds: dict[str, list] = {d: [] for d in DIMS}
     refs:  dict[str, list] = {d: [] for d in DIMS}
 
+    allowed_ids = [tokenizer.encode(str(i), add_special_tokens=False)[0] for i in range(1, 8)]
+    digit_processor = DigitOnlyLogitsProcessor(allowed_ids)
+
     with torch.no_grad():
         for rec in records:
             prompt = tokenizer.apply_chat_template(
@@ -117,8 +132,9 @@ def evaluate_tau(model, tokenizer, records: list[dict], max_len: int) -> dict:
                             truncation=True, max_length=max_len)
             enc = {k: v.to(model.device) for k, v in enc.items()}
             out = model.generate(
-                **enc, max_new_tokens=4, do_sample=False,
+                **enc, max_new_tokens=1, do_sample=False,
                 pad_token_id=tokenizer.eos_token_id,
+                logits_processor=[digit_processor],
             )
             gen = tokenizer.decode(
                 out[0][enc["input_ids"].shape[1]:], skip_special_tokens=True
