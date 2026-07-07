@@ -9,8 +9,9 @@ outputs/
 *.safetensors
 *.pt
 
-# 训练日志（可选择性保留）
-# logs/
+# 训练终端输出日志（nohup 等）
+logs/*.log
+train.log
 
 # 可视化图片（可选）
 # viz/figures/

@@ -1,9 +1,9 @@
 """
 viz/plot_data.py
 
-对训练数据做 EDA 可视化，输出到 viz/figures/data/。
+EDA visualizations for the training data, saved to viz/figures/data/.
 
-用法:
+Usage:
     python viz/plot_data.py
 """
 
@@ -41,7 +41,7 @@ def load_all_records() -> list[dict]:
 
 
 def plot_score_distribution(records: list[dict]) -> None:
-    """每个维度的分数分布直方图（1–7）。"""
+    """Score distribution histogram per dimension (1–7)."""
     fig, axes = plt.subplots(1, 4, figsize=(14, 4), sharey=True)
     colors = ["#4C72B0", "#DD8452", "#55A868", "#C44E52"]
 
@@ -62,11 +62,11 @@ def plot_score_distribution(records: list[dict]) -> None:
     path = FIG_DIR / "score_distribution.png"
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"保存: {path}")
+    print(f"Saved: {path}")
 
 
 def plot_language_distribution(records: list[dict]) -> None:
-    """语言分布条形图。"""
+    """Bar chart of sample counts per language."""
     lang_counts: dict[str, int] = {}
     for r in records:
         if r["meta"]["dimension"] != "faithfulness":
@@ -89,11 +89,11 @@ def plot_language_distribution(records: list[dict]) -> None:
     path = FIG_DIR / "language_distribution.png"
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"保存: {path}")
+    print(f"Saved: {path}")
 
 
 def plot_score_heatmap(records: list[dict]) -> None:
-    """语言 × 维度 的平均分热力图。"""
+    """Heatmap of mean human score per language × dimension."""
     langs = sorted({r["meta"]["language"] for r in records})
     matrix = np.zeros((len(langs), len(DIMS)))
 
@@ -127,11 +127,11 @@ def plot_score_heatmap(records: list[dict]) -> None:
     path = FIG_DIR / "score_heatmap.png"
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"保存: {path}")
+    print(f"Saved: {path}")
 
 
 def plot_model_scores(records: list[dict]) -> None:
-    """各生成模型的平均人工分（按维度分组）。"""
+    """Mean human score per generator model, grouped by dimension."""
     gen_models = sorted({r["meta"]["gen_model"] for r in records})
 
     fig, axes = plt.subplots(2, 2, figsize=(13, 9), sharey=True)
@@ -163,21 +163,21 @@ def plot_model_scores(records: list[dict]) -> None:
     path = FIG_DIR / "model_scores.png"
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"保存: {path}")
+    print(f"Saved: {path}")
 
 
 def main() -> None:
     records = load_all_records()
     if not records:
-        print("找不到数据，先运行 python data/prepare.py")
+        print("No data found. Run python data/prepare.py first.")
         return
 
-    print(f"加载 {len(records)} 条记录")
+    print(f"Loaded {len(records)} records.")
     plot_score_distribution(records)
     plot_language_distribution(records)
     plot_score_heatmap(records)
     plot_model_scores(records)
-    print(f"\n所有图表已保存至 {FIG_DIR}")
+    print(f"\nAll figures saved to {FIG_DIR}")
 
 
 if __name__ == "__main__":

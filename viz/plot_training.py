@@ -1,14 +1,14 @@
 """
 viz/plot_training.py
 
-可视化训练过程（支持 v1/v2 版本对比）：
-  1. Tau 相关系数随 epoch 的变化
-  2. 测试集 v1 vs v2 tau 对比柱状图
-  3. 推理结果的预测分 vs 人工分散点图
-  4. 预测分数分布 vs 人工分布对比
-  5. 各维度 tau 雷达图
+Visualize training progress (supports v1/v2 version comparison):
+  1. Kendall's tau vs. epoch curve
+  2. Test-set v1 vs v2 tau bar chart
+  3. Predicted score vs. human score scatter plot
+  4. Predicted score distribution vs. human distribution
+  5. Per-dimension tau radar chart
 
-用法:
+Usage:
     python viz/plot_training.py
     python viz/plot_training.py --tau-only
 """
@@ -85,7 +85,7 @@ def load_predictions(name: str) -> list[dict] | None:
         return json.load(f)
 
 
-# ── 1. Tau 训练曲线 ───────────────────────────────────────────────────────────
+# ── 1. Tau training curves ────────────────────────────────────────────────────
 
 def plot_tau_curves(logs: dict[str, list[dict]]) -> None:
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
@@ -126,10 +126,10 @@ def plot_tau_curves(logs: dict[str, list[dict]]) -> None:
     path = FIG_DIR / "tau_curves.png"
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"保存: {path}")
+    print(f"Saved: {path}")
 
 
-# ── 2. 测试集 v1 vs v2 对比 ──────────────────────────────────────────────────
+# ── 2. Test-set v1 vs v2 comparison ──────────────────────────────────────────
 
 def plot_version_comparison(reports: list[dict]) -> None:
     metrics = DIMS + ["tau_average"]
@@ -141,7 +141,7 @@ def plot_version_comparison(reports: list[dict]) -> None:
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
-    # 左：tau 各维度
+    # left: tau per dimension
     ax = axes[0]
     for i, report in enumerate(reports):
         name = report["model"]
@@ -156,7 +156,7 @@ def plot_version_comparison(reports: list[dict]) -> None:
     ax.grid(axis="y", alpha=0.3)
     ax.axhline(0, color="gray", linestyle="--", linewidth=0.8)
 
-    # 右：ranking accuracy
+    # right: ranking accuracy
     ax = axes[1]
     names  = [get_label(r["model"]) for r in reports]
     accs   = [r["ranking_accuracy"] for r in reports]
@@ -178,10 +178,10 @@ def plot_version_comparison(reports: list[dict]) -> None:
     path = FIG_DIR / "version_comparison.png"
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"保存: {path}")
+    print(f"Saved: {path}")
 
 
-# ── 3. 预测分 vs 人工分散点图 ─────────────────────────────────────────────────
+# ── 3. Predicted vs. human score scatter plot ─────────────────────────────────
 
 def plot_scatter(preds_map: dict[str, list[dict]]) -> None:
     n_models = len(preds_map)
@@ -219,7 +219,7 @@ def plot_scatter(preds_map: dict[str, list[dict]]) -> None:
     path = FIG_DIR / "scatter_pred_vs_human.png"
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"保存: {path}")
+    print(f"Saved: {path}")
 
 
 def _tau(xs, ys) -> float:
@@ -235,7 +235,7 @@ def _tau(xs, ys) -> float:
     return (c - d) / denom if denom else float("nan")
 
 
-# ── 4. 分数分布对比 ───────────────────────────────────────────────────────────
+# ── 4. Score distribution comparison ─────────────────────────────────────────
 
 def plot_score_dist_comparison(preds_map: dict[str, list[dict]]) -> None:
     fig, axes = plt.subplots(1, 4, figsize=(14, 4))
@@ -273,10 +273,10 @@ def plot_score_dist_comparison(preds_map: dict[str, list[dict]]) -> None:
     path = FIG_DIR / "score_distribution_comparison.png"
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"保存: {path}")
+    print(f"Saved: {path}")
 
 
-# ── 5. 雷达图 ─────────────────────────────────────────────────────────────────
+# ── 5. Radar chart ────────────────────────────────────────────────────────────
 
 def plot_radar(tau_reports: list[dict]) -> None:
     categories = [d.capitalize() for d in DIMS]
@@ -306,17 +306,17 @@ def plot_radar(tau_reports: list[dict]) -> None:
     path = FIG_DIR / "tau_radar.png"
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"保存: {path}")
+    print(f"Saved: {path}")
 
 
-# ── 主流程 ────────────────────────────────────────────────────────────────────
+# ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--tau-only", action="store_true")
     args = parser.parse_args()
 
-    # tau 训练曲线
+    # tau training curves
     tau_logs = {}
     for name in ("llama_v1", "llama_v2", "qwen_v1", "qwen_v2"):
         log = load_tau_log(name)
@@ -326,12 +326,12 @@ def main() -> None:
     if tau_logs:
         plot_tau_curves(tau_logs)
     else:
-        print("未找到 tau log")
+        print("No tau log found.")
 
     if args.tau_only:
         return
 
-    # 推理结果可视化
+    # inference result visualizations
     preds_map: dict[str, list[dict]] = {}
     for name in ("llama-zero-shot", "llama-judge-v1", "llama-judge-v2",
                  "qwen-zero-shot",  "qwen-judge-v1",  "qwen-judge-v2"):
@@ -343,7 +343,7 @@ def main() -> None:
         plot_scatter(preds_map)
         plot_score_dist_comparison(preds_map)
 
-    # tau 报告（version comparison + radar）
+    # tau report (version comparison + radar)
     tau_report_path = PRED_DIR / "tau_report.json"
     if tau_report_path.exists():
         with open(tau_report_path) as f:
@@ -353,9 +353,9 @@ def main() -> None:
             plot_radar(reports)
 
     if not tau_logs and not preds_map:
-        print("没有可用数据。请先完成训练和推理。")
+        print("No data available. Run training and inference first.")
     else:
-        print(f"\n所有图表已保存至 {FIG_DIR}")
+        print(f"\nAll figures saved to {FIG_DIR}")
 
 
 if __name__ == "__main__":

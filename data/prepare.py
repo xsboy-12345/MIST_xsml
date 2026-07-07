@@ -1,12 +1,12 @@
 """
 data/prepare.py
 
-将 xlsum_humeval.json 展开为 judge 训练格式，输出 train/dev/test.jsonl。
-每条 humeval 记录 × 4 维度 = 4 条训练样本，assistant 只输出一个数字（1-7）。
+Expand xlsum_humeval.json into judge training format, output train/dev/test.jsonl.
+Each humeval record × 4 dimensions = 4 training samples; assistant outputs a single digit (1-7).
 
-用法:
+Usage:
     python data/prepare.py
-    python data/prepare.py --min-score 0   # 不过滤，保留全部 17136 条
+    python data/prepare.py --min-score 0   # no filtering, keep all 17136 records
 """
 
 from __future__ import annotations
@@ -128,7 +128,7 @@ def write_jsonl(path: pathlib.Path, records: list[dict]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--min-score", type=float, default=1.0,
-                        help="过滤人工评分均值低于此值的记录（默认不过滤）")
+                        help="filter records whose mean human score is below this value (default: no filtering)")
     args = parser.parse_args()
 
     with open(SRC, encoding="utf-8") as f:
@@ -151,12 +151,12 @@ def main() -> None:
     write_jsonl(OUT_DIR / "dev.jsonl",   dev)
     write_jsonl(OUT_DIR / "test.jsonl",  test)
 
-    print(f"总计: {len(all_records)} 条  (来自 {len(raw)} 条 humeval × {len(DIMENSIONS)} 维度)")
+    print(f"Total: {len(all_records)} samples  ({len(raw)} humeval records × {len(DIMENSIONS)} dimensions)")
     print(f"  train : {len(train)}")
     print(f"  dev   : {len(dev)}")
     print(f"  test  : {len(test)}")
 
-    # 写统计
+    # write stats
     lang_dist: dict[str, int] = {}
     dim_dist:  dict[str, int] = {}
     score_dist: dict[int, int] = {}
@@ -177,7 +177,7 @@ def main() -> None:
     stats_path = OUT_DIR / "stats.json"
     with open(stats_path, "w", encoding="utf-8") as f:
         json.dump(stats, f, ensure_ascii=False, indent=2)
-    print(f"统计写入: {stats_path}")
+    print(f"Stats written to: {stats_path}")
 
 
 if __name__ == "__main__":

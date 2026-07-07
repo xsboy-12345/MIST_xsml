@@ -1,10 +1,10 @@
 """
 eval/compute_tau.py
 
-读取 predict.py 的输出，计算 Kendall tau 和 ranking_accuracy，
-与 humeval_aggregated/judge_xlsum.json 格式对齐。
+Read predict.py output, compute Kendall tau and ranking_accuracy,
+aligned with the humeval_aggregated/judge_xlsum.json format.
 
-用法:
+Usage:
     python eval/compute_tau.py --pred eval/outputs/llama-judge.json
     python eval/compute_tau.py --pred eval/outputs/llama-judge.json eval/outputs/qwen-judge.json
 """
@@ -34,7 +34,7 @@ def kendall_tau(xs: list[float], ys: list[float]) -> float:
 
 
 def ranking_accuracy(model_avg_scores: dict[str, float], human_avg_scores: dict[str, float]) -> float:
-    """所有模型对之间，排名方向一致的比例。"""
+    """Fraction of model pairs where predicted ranking matches human ranking."""
     models = sorted(set(model_avg_scores) & set(human_avg_scores))
     correct = total = 0
     for m1, m2 in combinations(models, 2):

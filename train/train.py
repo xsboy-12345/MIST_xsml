@@ -202,7 +202,7 @@ def main() -> None:
         quantization_config=bnb_cfg,
         device_map="auto",
         trust_remote_code=True,
-        dtype=torch.bfloat16,
+        torch_dtype=torch.bfloat16,
     )
     model.config.use_cache = False
 
