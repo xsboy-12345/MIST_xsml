@@ -1,12 +1,16 @@
 """
 eval/predict.py
 
-Run inference with a trained LoRA adapter on test.jsonl and output predicted scores.
+Run inference on test.jsonl with either a fine-tuned LoRA adapter or a base model (zero-shot).
 Output format is compatible with submissions_judge_xlsum (can be fed directly to compute_tau).
 
-Usage:
+Usage (fine-tuned):
     python eval/predict.py --adapter outputs/llama/adapter_final --model-name llama-judge
     python eval/predict.py --adapter outputs/qwen/adapter_final  --model-name qwen-judge
+
+Usage (zero-shot, base model only):
+    python eval/predict.py --base-model meta-llama/Llama-3.1-8B-Instruct --model-name llama-zero-shot
+    python eval/predict.py --base-model Qwen/Qwen2.5-7B-Instruct          --model-name qwen-zero-shot
 """
 
 from __future__ import annotations
@@ -46,20 +50,16 @@ def load_jsonl(path: pathlib.Path) -> list[dict]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--adapter",    required=True, help="adapter directory containing adapter_config.json")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--adapter",    help="adapter directory containing adapter_config.json (fine-tuned mode)")
+    group.add_argument("--base-model", help="base model name or path for zero-shot inference")
     parser.add_argument("--model-name", required=True, help="output filename (without extension)")
     parser.add_argument("--split",      default="test", choices=["dev", "test"])
     parser.add_argument("--limit",      type=int, default=None, help="only run inference on first N samples (for debugging)")
     parser.add_argument("--use-4bit",   action="store_true")
     args = parser.parse_args()
 
-    adapter_path = pathlib.Path(args.adapter)
-
-    # ── Load tokenizer + base model + adapter ────────────────────────────────
-    tokenizer = AutoTokenizer.from_pretrained(adapter_path, trust_remote_code=True)
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-
+    # ── Load tokenizer + model ────────────────────────────────────────────────
     bnb_cfg = None
     if args.use_4bit:
         bnb_cfg = BitsAndBytesConfig(
@@ -69,15 +69,34 @@ def main() -> None:
             bnb_4bit_use_double_quant=True,
         )
 
-    base_model_name = json.loads((adapter_path / "adapter_config.json").read_text())["base_model_name_or_path"]
-    base = AutoModelForCausalLM.from_pretrained(
-        base_model_name,
-        quantization_config=bnb_cfg,
-        device_map="auto",
-        trust_remote_code=True,
-        torch_dtype=torch.bfloat16,
-    )
-    model = PeftModel.from_pretrained(base, str(adapter_path))
+    if args.adapter:
+        # Fine-tuned mode: load base model + LoRA adapter
+        adapter_path = pathlib.Path(args.adapter)
+        tokenizer = AutoTokenizer.from_pretrained(adapter_path, trust_remote_code=True)
+        base_model_name = json.loads((adapter_path / "adapter_config.json").read_text())["base_model_name_or_path"]
+        base = AutoModelForCausalLM.from_pretrained(
+            base_model_name,
+            quantization_config=bnb_cfg,
+            device_map="auto",
+            trust_remote_code=True,
+            torch_dtype=torch.bfloat16,
+        )
+        model = PeftModel.from_pretrained(base, str(adapter_path))
+        print(f"Loaded fine-tuned model from {adapter_path}")
+    else:
+        # Zero-shot mode: load base model only, no adapter
+        tokenizer = AutoTokenizer.from_pretrained(args.base_model, trust_remote_code=True)
+        model = AutoModelForCausalLM.from_pretrained(
+            args.base_model,
+            quantization_config=bnb_cfg,
+            device_map="auto",
+            trust_remote_code=True,
+            torch_dtype=torch.bfloat16,
+        )
+        print(f"Loaded base model (zero-shot): {args.base_model}")
+
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
     model.eval()
 
     # Restrict generation to digit tokens 1-7 to prevent the model from continuing in the input language
