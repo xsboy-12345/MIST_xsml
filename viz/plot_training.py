@@ -318,6 +318,61 @@ def plot_radar(tau_reports: list[dict]) -> None:
     print(f"Saved: {path}")
 
 
+# ── 6. Score consistency: Pearson r + MAE ─────────────────────────────────────
+
+def plot_score_consistency(reports: list[dict]) -> None:
+    """Pearson r and MAE per dimension and model — score consistency metrics."""
+    metrics = DIMS + ["average"]
+    metric_labels = [d.capitalize() for d in DIMS] + ["Average"]
+    x = np.arange(len(metrics))
+    n = len(reports)
+    width = 0.7 / n
+    offsets = np.linspace(-(n - 1) / 2, (n - 1) / 2, n) * width
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+    # left: Pearson r
+    ax = axes[0]
+    for i, report in enumerate(reports):
+        name = report["model"]
+        if "pearson_by_dim" not in report:
+            continue
+        vals = [report["pearson_by_dim"].get(d, float("nan")) for d in DIMS] + [report.get("pearson_average", float("nan"))]
+        ax.bar(x + offsets[i], vals, width, label=get_label(name),
+               color=get_color(name), alpha=0.85, edgecolor="white")
+    ax.set_xticks(x)
+    ax.set_xticklabels(metric_labels)
+    ax.set_ylabel("Pearson r")
+    ax.set_title("Pearson Correlation (score consistency)", fontsize=12, fontweight="bold")
+    ax.legend(fontsize=7)
+    ax.grid(axis="y", alpha=0.3)
+    ax.axhline(0, color="gray", linestyle="--", linewidth=0.8)
+
+    # right: MAE (lower is better)
+    ax = axes[1]
+    for i, report in enumerate(reports):
+        name = report["model"]
+        if "mae_by_dim" not in report:
+            continue
+        vals = [report["mae_by_dim"].get(d, float("nan")) for d in DIMS] + [report.get("mae_average", float("nan"))]
+        ax.bar(x + offsets[i], vals, width, label=get_label(name),
+               color=get_color(name), alpha=0.85, edgecolor="white")
+    ax.set_xticks(x)
+    ax.set_xticklabels(metric_labels)
+    ax.set_ylabel("MAE (Likert points) ↓")
+    ax.set_title("Mean Absolute Error (lower = better)", fontsize=12, fontweight="bold")
+    ax.legend(fontsize=7)
+    ax.grid(axis="y", alpha=0.3)
+
+    fig.suptitle("Score Consistency Metrics: Pearson r and MAE vs. Human Scores",
+                 fontsize=13, fontweight="bold")
+    plt.tight_layout()
+    path = FIG_DIR / "score_consistency.png"
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved: {path}")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -360,6 +415,7 @@ def main() -> None:
         if reports:
             plot_version_comparison(reports)
             plot_radar(reports)
+            plot_score_consistency(reports)
 
     if not tau_logs and not preds_map:
         print("No data available. Run training and inference first.")

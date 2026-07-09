@@ -1,8 +1,15 @@
 """
 eval/compute_tau.py
 
-Read predict.py output, compute Kendall tau and ranking_accuracy,
-aligned with the humeval_aggregated/judge_xlsum.json format.
+Read predict.py output and compute multiple evaluation metrics in parallel:
+
+  Ranking metrics (measure ordering agreement with human scores):
+    - Kendall's τ      : fraction of concordant pairs minus discordant pairs
+    - Ranking accuracy : pairwise model-level ranking agreement
+
+  Score consistency metrics (measure how close predicted scores are to human scores):
+    - Pearson r        : linear correlation between predicted and human scores
+    - MAE              : mean absolute error (average score gap, in Likert points)
 
 Usage:
     python eval/compute_tau.py --pred eval/outputs/llama-judge.json
@@ -18,6 +25,8 @@ ROOT     = pathlib.Path(__file__).parent.parent
 OUT_DIR  = ROOT / "eval/outputs"
 DIMS     = ["faithfulness", "coverage", "naturalness", "coherence"]
 
+
+# ── Ranking metrics ───────────────────────────────────────────────────────────
 
 def kendall_tau(xs: list[float], ys: list[float]) -> float:
     pairs = list(zip(xs, ys))
@@ -46,6 +55,29 @@ def ranking_accuracy(model_avg_scores: dict[str, float], human_avg_scores: dict[
     return correct / total if total else float("nan")
 
 
+# ── Score consistency metrics ─────────────────────────────────────────────────
+
+def pearson_r(xs: list[float], ys: list[float]) -> float:
+    """Linear correlation between predicted and human scores."""
+    n = len(xs)
+    if n < 2:
+        return float("nan")
+    mx = sum(xs) / n
+    my = sum(ys) / n
+    num   = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+    denom = math.sqrt(sum((x - mx) ** 2 for x in xs) * sum((y - my) ** 2 for y in ys))
+    return num / denom if denom else float("nan")
+
+
+def mean_absolute_error(xs: list[float], ys: list[float]) -> float:
+    """Average absolute difference between predicted and human scores (in Likert points)."""
+    if not xs:
+        return float("nan")
+    return sum(abs(x - y) for x, y in zip(xs, ys)) / len(xs)
+
+
+# ── Main report ───────────────────────────────────────────────────────────────
+
 def load_predictions(path: pathlib.Path) -> list[dict]:
     with open(path, encoding="utf-8") as f:
         return json.load(f)
@@ -54,9 +86,8 @@ def load_predictions(path: pathlib.Path) -> list[dict]:
 def compute_report(preds: list[dict], model_name: str) -> dict:
     valid = [p for p in preds if p["answer"] not in ("-1", None)]
 
-    # tau per dimension
-    preds_by_dim:  dict[str, list[int]] = defaultdict(list)
-    refs_by_dim:   dict[str, list[int]] = defaultdict(list)
+    preds_by_dim: dict[str, list[int]]   = defaultdict(list)
+    refs_by_dim:  dict[str, list[int]]   = defaultdict(list)
     for p in valid:
         dim   = p["_dimension"]
         human = p["_human_score"]
@@ -64,6 +95,7 @@ def compute_report(preds: list[dict], model_name: str) -> dict:
         preds_by_dim[dim].append(pred)
         refs_by_dim[dim].append(human)
 
+    # ── Kendall's τ ───────────────────────────────────────────────────────────
     tau_by_dim = {
         dim: round(kendall_tau(preds_by_dim[dim], refs_by_dim[dim]), 6)
         for dim in DIMS
@@ -71,7 +103,23 @@ def compute_report(preds: list[dict], model_name: str) -> dict:
     valid_taus = [v for v in tau_by_dim.values() if not math.isnan(v)]
     tau_avg = round(sum(valid_taus) / len(valid_taus), 6) if valid_taus else float("nan")
 
-    # ranking_accuracy: aggregate average scores per gen_model
+    # ── Pearson r ─────────────────────────────────────────────────────────────
+    pearson_by_dim = {
+        dim: round(pearson_r(preds_by_dim[dim], refs_by_dim[dim]), 6)
+        for dim in DIMS
+    }
+    valid_pearson = [v for v in pearson_by_dim.values() if not math.isnan(v)]
+    pearson_avg = round(sum(valid_pearson) / len(valid_pearson), 6) if valid_pearson else float("nan")
+
+    # ── MAE ───────────────────────────────────────────────────────────────────
+    mae_by_dim = {
+        dim: round(mean_absolute_error(preds_by_dim[dim], refs_by_dim[dim]), 6)
+        for dim in DIMS
+    }
+    valid_mae = [v for v in mae_by_dim.values() if not math.isnan(v)]
+    mae_avg = round(sum(valid_mae) / len(valid_mae), 6) if valid_mae else float("nan")
+
+    # ── Ranking accuracy ──────────────────────────────────────────────────────
     pred_per_genmodel:  dict[str, list[int]] = defaultdict(list)
     human_per_genmodel: dict[str, list[int]] = defaultdict(list)
     for p in valid:
@@ -90,9 +138,15 @@ def compute_report(preds: list[dict], model_name: str) -> dict:
         "total":            len(preds),
         "valid":            len(valid),
         "parse_failures":   parse_failures,
+        # ranking metrics
         "tau_average":      tau_avg,
         "tau_by_dim":       tau_by_dim,
         "ranking_accuracy": rank_acc,
+        # score consistency metrics
+        "pearson_average":  pearson_avg,
+        "pearson_by_dim":   pearson_by_dim,
+        "mae_average":      mae_avg,
+        "mae_by_dim":       mae_by_dim,
     }
 
 
@@ -112,10 +166,18 @@ def main() -> None:
         print(f"\n=== {model_name} ===")
         print(f"  valid:            {report['valid']} / {report['total']}")
         print(f"  parse_failures:   {report['parse_failures']}")
+        print(f"  --- Ranking metrics ---")
         print(f"  tau_average:      {report['tau_average']:.4f}")
-        for dim, tau in report["tau_by_dim"].items():
-            print(f"    {dim:15s}: {tau:.4f}")
+        for dim, v in report["tau_by_dim"].items():
+            print(f"    {dim:15s}: {v:.4f}")
         print(f"  ranking_accuracy: {report['ranking_accuracy']:.4f}")
+        print(f"  --- Score consistency metrics ---")
+        print(f"  pearson_average:  {report['pearson_average']:.4f}")
+        for dim, v in report["pearson_by_dim"].items():
+            print(f"    {dim:15s}: {v:.4f}")
+        print(f"  mae_average:      {report['mae_average']:.4f}")
+        for dim, v in report["mae_by_dim"].items():
+            print(f"    {dim:15s}: {v:.4f}")
 
     out_path = OUT_DIR / "tau_report.json"
     with open(out_path, "w", encoding="utf-8") as f:
