@@ -42,6 +42,20 @@
     "ranking_accuracy": 0.625
   },
   {
+    "model": "llama-judge-v3",
+    "total": 1715,
+    "valid": 1715,
+    "parse_failures": 0,
+    "tau_average": 0.114449,
+    "tau_by_dim": {
+      "faithfulness": 0.121191,
+      "coverage": 0.080906,
+      "naturalness": 0.140787,
+      "coherence": 0.114912
+    },
+    "ranking_accuracy": 0.558824
+  },
+  {
     "model": "qwen-zero-shot",
     "total": 1715,
     "valid": 1715,
@@ -82,5 +96,19 @@
       "coherence": 0.088246
     },
     "ranking_accuracy": 0.654412
+  },
+  {
+    "model": "qwen-judge-v3",
+    "total": 1715,
+    "valid": 1715,
+    "parse_failures": 0,
+    "tau_average": 0.096662,
+    "tau_by_dim": {
+      "faithfulness": 0.121702,
+      "coverage": 0.090228,
+      "naturalness": 0.062915,
+      "coherence": 0.111805
+    },
+    "ranking_accuracy": 0.625
   }
 ]
