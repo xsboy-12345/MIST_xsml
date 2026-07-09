@@ -11,7 +11,21 @@
       "naturalness": 0.075882,
       "coherence": 0.027218
     },
-    "ranking_accuracy": 0.573529
+    "ranking_accuracy": 0.573529,
+    "pearson_average": 0.112439,
+    "pearson_by_dim": {
+      "faithfulness": 0.175566,
+      "coverage": 0.12152,
+      "naturalness": 0.121601,
+      "coherence": 0.031068
+    },
+    "mae_average": 1.869109,
+    "mae_by_dim": {
+      "faithfulness": 1.841986,
+      "coverage": 1.732227,
+      "naturalness": 2.022222,
+      "coherence": 1.88
+    }
   },
   {
     "model": "llama-judge-v1",
@@ -25,7 +39,21 @@
       "naturalness": 0.044276,
       "coherence": 0.119474
     },
-    "ranking_accuracy": 0.477941
+    "ranking_accuracy": 0.477941,
+    "pearson_average": 0.111479,
+    "pearson_by_dim": {
+      "faithfulness": 0.141326,
+      "coverage": 0.100359,
+      "naturalness": 0.077447,
+      "coherence": 0.126785
+    },
+    "mae_average": 1.649194,
+    "mae_by_dim": {
+      "faithfulness": 1.62754,
+      "coverage": 1.635071,
+      "naturalness": 1.746667,
+      "coherence": 1.5875
+    }
   },
   {
     "model": "llama-judge-v2",
@@ -39,7 +67,21 @@
       "naturalness": 0.109498,
       "coherence": 0.102982
     },
-    "ranking_accuracy": 0.625
+    "ranking_accuracy": 0.625,
+    "pearson_average": 0.182071,
+    "pearson_by_dim": {
+      "faithfulness": 0.236361,
+      "coverage": 0.176904,
+      "naturalness": 0.178829,
+      "coherence": 0.13619
+    },
+    "mae_average": 1.537759,
+    "mae_by_dim": {
+      "faithfulness": 1.471783,
+      "coverage": 1.523697,
+      "naturalness": 1.655556,
+      "coherence": 1.5
+    }
   },
   {
     "model": "llama-judge-v3",
@@ -53,7 +95,21 @@
       "naturalness": 0.140787,
       "coherence": 0.114912
     },
-    "ranking_accuracy": 0.558824
+    "ranking_accuracy": 0.558824,
+    "pearson_average": 0.164017,
+    "pearson_by_dim": {
+      "faithfulness": 0.197867,
+      "coverage": 0.115289,
+      "naturalness": 0.203968,
+      "coherence": 0.138945
+    },
+    "mae_average": 1.527837,
+    "mae_by_dim": {
+      "faithfulness": 1.435666,
+      "coverage": 1.57346,
+      "naturalness": 1.562222,
+      "coherence": 1.54
+    }
   },
   {
     "model": "qwen-zero-shot",
@@ -67,7 +123,21 @@
       "naturalness": 0.111161,
       "coherence": 0.13
     },
-    "ranking_accuracy": 0.625
+    "ranking_accuracy": 0.625,
+    "pearson_average": 0.184312,
+    "pearson_by_dim": {
+      "faithfulness": 0.203352,
+      "coverage": 0.194625,
+      "naturalness": 0.146697,
+      "coherence": 0.192573
+    },
+    "mae_average": 1.674578,
+    "mae_by_dim": {
+      "faithfulness": 1.577878,
+      "coverage": 1.658768,
+      "naturalness": 1.786667,
+      "coherence": 1.675
+    }
   },
   {
     "model": "qwen-judge-v1",
@@ -81,7 +151,21 @@
       "naturalness": 0.093017,
       "coherence": 0.111617
     },
-    "ranking_accuracy": 0.801471
+    "ranking_accuracy": 0.801471,
+    "pearson_average": 0.11386,
+    "pearson_by_dim": {
+      "faithfulness": 0.083039,
+      "coverage": 0.049628,
+      "naturalness": 0.133732,
+      "coherence": 0.189039
+    },
+    "mae_average": 1.611282,
+    "mae_by_dim": {
+      "faithfulness": 1.638826,
+      "coverage": 1.668246,
+      "naturalness": 1.595556,
+      "coherence": 1.5425
+    }
   },
   {
     "model": "qwen-judge-v2",
@@ -95,7 +179,21 @@
       "naturalness": 0.084593,
       "coherence": 0.088246
     },
-    "ranking_accuracy": 0.654412
+    "ranking_accuracy": 0.654412,
+    "pearson_average": 0.156449,
+    "pearson_by_dim": {
+      "faithfulness": 0.168585,
+      "coverage": 0.206558,
+      "naturalness": 0.131259,
+      "coherence": 0.119394
+    },
+    "mae_average": 1.625044,
+    "mae_by_dim": {
+      "faithfulness": 1.591422,
+      "coverage": 1.578199,
+      "naturalness": 1.735556,
+      "coherence": 1.595
+    }
   },
   {
     "model": "qwen-judge-v3",
@@ -109,6 +207,20 @@
       "naturalness": 0.062915,
       "coherence": 0.111805
     },
-    "ranking_accuracy": 0.625
+    "ranking_accuracy": 0.625,
+    "pearson_average": 0.137485,
+    "pearson_by_dim": {
+      "faithfulness": 0.151116,
+      "coverage": 0.160072,
+      "naturalness": 0.103302,
+      "coherence": 0.135451
+    },
+    "mae_average": 1.596722,
+    "mae_by_dim": {
+      "faithfulness": 1.510158,
+      "coverage": 1.594787,
+      "naturalness": 1.704444,
+      "coherence": 1.5775
+    }
   }
 ]
