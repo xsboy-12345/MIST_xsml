@@ -62,6 +62,21 @@ LABELS = {
 
 LINESTYLES = {"v1": "--", "v2": "-", "v3": "-.", "zero": ":"}
 
+# ── Known-issue registry ───────────────────────────────────────────────────────
+# Per-epoch dev-tau logs (logs/*_tau_log.json) affected by a known train/eval
+# precision mismatch: TauCallback evaluates the 4-bit quantized training model,
+# while eval/predict.py (used for tau_report.json / test-set numbers) evaluates
+# an unquantized reload by default. Once generation is hard-restricted to 7
+# candidate tokens, this precision gap is enough to flip the argmax, so these
+# curves read as near-random even though the corresponding test-set results in
+# eval/outputs/tau_report.json are normal. See README § Version History & Known
+# Issues. Only affects the *_tau_log.json curves — tau_report.json entries for
+# the same versions are NOT flagged here because they come from predict.py.
+KNOWN_ISSUES = {
+    "llama_v3": "dev-τ log unreliable (train/eval precision mismatch) — see README",
+    "qwen_v3":  "dev-τ log unreliable (train/eval precision mismatch) — see README",
+}
+
 
 def get_color(name: str) -> str:
     return COLORS.get(name, "#555555")
@@ -98,13 +113,17 @@ def load_predictions(name: str) -> list[dict] | None:
 
 def plot_tau_curves(logs: dict[str, list[dict]]) -> None:
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    flagged_present = [n for n in logs if n in KNOWN_ISSUES]
 
     ax = axes[0]
     for name, log in logs.items():
         epochs = [e["epoch"] for e in log]
         taus   = [e.get("tau_average", float("nan")) for e in log]
-        ax.plot(epochs, taus, marker="o", label=get_label(name),
-                color=get_color(name), linestyle=get_linestyle(name), linewidth=2)
+        flagged = name in KNOWN_ISSUES
+        label = ("⚠ " if flagged else "") + get_label(name)
+        ax.plot(epochs, taus, marker="x" if flagged else "o", label=label,
+                color=get_color(name), linestyle=get_linestyle(name),
+                linewidth=2, alpha=0.45 if flagged else 1.0)
     ax.set_xlabel("Epoch")
     ax.set_ylabel("Kendall's τ (average)")
     ax.set_title("Average Tau vs. Epoch", fontsize=12, fontweight="bold")
@@ -120,8 +139,11 @@ def plot_tau_curves(logs: dict[str, list[dict]]) -> None:
     for i, (name, log) in enumerate(logs.items()):
         last = log[-1]
         vals = [last.get(d, float("nan")) for d in DIMS]
-        ax.bar(x + offsets[i], vals, width, label=get_label(name),
-               color=get_color(name), alpha=0.85, edgecolor="white")
+        flagged = name in KNOWN_ISSUES
+        label = ("⚠ " if flagged else "") + get_label(name)
+        ax.bar(x + offsets[i], vals, width, label=label,
+               color=get_color(name), alpha=0.45 if flagged else 0.85,
+               edgecolor="white", hatch="///" if flagged else None)
     ax.set_xticks(x)
     ax.set_xticklabels([d.capitalize() for d in DIMS])
     ax.set_ylabel("Kendall's τ")
@@ -131,6 +153,11 @@ def plot_tau_curves(logs: dict[str, list[dict]]) -> None:
     ax.axhline(0, color="gray", linestyle="--", linewidth=0.8)
 
     fig.suptitle("Training Progress: Tau Correlation with Human Ratings", fontsize=13, fontweight="bold")
+    if flagged_present:
+        fig.text(0.5, -0.02,
+                  "⚠ Faded/hatched series (v3): dev-τ log unreliable due to a known train/eval precision "
+                  "mismatch — see README § Version History & Known Issues. Test-set results are unaffected.",
+                  ha="center", fontsize=8.5, color="#8B0000", style="italic")
     plt.tight_layout()
     path = FIG_DIR / "tau_curves.png"
     fig.savefig(path, dpi=150, bbox_inches="tight")
@@ -138,7 +165,10 @@ def plot_tau_curves(logs: dict[str, list[dict]]) -> None:
     print(f"Saved: {path}")
 
 
-# ── 2. Test-set v1 vs v2 comparison ──────────────────────────────────────────
+# ── 2. Test-set version comparison ───────────────────────────────────────────
+# Built from eval/outputs/tau_report.json (predict.py output) — these numbers
+# are NOT affected by the v3 dev-τ known issue (see KNOWN_ISSUES above), so
+# nothing here needs to be flagged.
 
 def plot_version_comparison(reports: list[dict]) -> None:
     metrics = DIMS + ["tau_average"]
@@ -160,7 +190,7 @@ def plot_version_comparison(reports: list[dict]) -> None:
     ax.set_xticks(x)
     ax.set_xticklabels(metric_labels)
     ax.set_ylabel("Kendall's τ")
-    ax.set_title("Test Tau: v1 vs v2", fontsize=12, fontweight="bold")
+    ax.set_title("Test Tau by Version", fontsize=12, fontweight="bold")
     ax.legend()
     ax.grid(axis="y", alpha=0.3)
     ax.axhline(0, color="gray", linestyle="--", linewidth=0.8)
@@ -176,12 +206,13 @@ def plot_version_comparison(reports: list[dict]) -> None:
                 f"{acc:.3f}", ha="center", va="bottom", fontsize=10)
     ax.axhline(0.5, color="gray", linestyle="--", linewidth=0.8, label="Random (0.5)")
     ax.set_ylabel("Ranking Accuracy")
-    ax.set_title("Ranking Accuracy: v1 vs v2", fontsize=12, fontweight="bold")
+    ax.set_title("Ranking Accuracy by Version", fontsize=12, fontweight="bold")
     ax.set_ylim(0, 1)
     ax.legend()
     ax.grid(axis="y", alpha=0.3)
+    plt.setp(ax.get_xticklabels(), rotation=30, ha="right", fontsize=8.5)
 
-    fig.suptitle("Test Set Performance: Before vs After Hyperparameter Tuning",
+    fig.suptitle("Test Set Performance Across Versions (zero-shot / v1 / v2 / v3)",
                  fontsize=13, fontweight="bold")
     plt.tight_layout()
     path = FIG_DIR / "version_comparison.png"
@@ -192,7 +223,7 @@ def plot_version_comparison(reports: list[dict]) -> None:
 
 # ── 3. Predicted vs. human score scatter plot ─────────────────────────────────
 
-def plot_scatter(preds_map: dict[str, list[dict]]) -> None:
+def plot_scatter(preds_map: dict[str, list[dict]], missing: list[str] | None = None) -> None:
     n_models = len(preds_map)
     fig, axes = plt.subplots(n_models, 4, figsize=(14, 4 * n_models))
     if n_models == 1:
@@ -224,6 +255,10 @@ def plot_scatter(preds_map: dict[str, list[dict]]) -> None:
                         fontsize=9, verticalalignment="top", color="darkred")
 
     fig.suptitle("Predicted vs. Human Scores", fontsize=13, fontweight="bold")
+    if missing:
+        fig.text(0.5, -0.01,
+                  f"⚠ Not shown (raw predictions unavailable locally): {', '.join(get_label(m) for m in missing)}",
+                  ha="center", fontsize=8.5, color="#8B0000", style="italic")
     plt.tight_layout()
     path = FIG_DIR / "scatter_pred_vs_human.png"
     fig.savefig(path, dpi=150, bbox_inches="tight")
@@ -246,7 +281,7 @@ def _tau(xs, ys) -> float:
 
 # ── 4. Score distribution comparison ─────────────────────────────────────────
 
-def plot_score_dist_comparison(preds_map: dict[str, list[dict]]) -> None:
+def plot_score_dist_comparison(preds_map: dict[str, list[dict]], missing: list[str] | None = None) -> None:
     fig, axes = plt.subplots(1, 4, figsize=(14, 4))
     x = np.arange(1, 8)
     n_bars = 1 + len(preds_map)
@@ -278,6 +313,10 @@ def plot_score_dist_comparison(preds_map: dict[str, list[dict]]) -> None:
         ax.legend(fontsize=7)
 
     fig.suptitle("Score Distribution: Predicted vs. Human", fontsize=13, fontweight="bold")
+    if missing:
+        fig.text(0.5, -0.02,
+                  f"⚠ Not shown (raw predictions unavailable locally): {', '.join(get_label(m) for m in missing)}",
+                  ha="center", fontsize=8.5, color="#8B0000", style="italic")
     plt.tight_layout()
     path = FIG_DIR / "score_distribution_comparison.png"
     fig.savefig(path, dpi=150, bbox_inches="tight")
@@ -396,16 +435,20 @@ def main() -> None:
         return
 
     # inference result visualizations
+    all_pred_names = ("llama-zero-shot", "llama-judge-v1", "llama-judge-v2", "llama-judge-v3",
+                       "qwen-zero-shot",  "qwen-judge-v1",  "qwen-judge-v2",  "qwen-judge-v3")
     preds_map: dict[str, list[dict]] = {}
-    for name in ("llama-zero-shot", "llama-judge-v1", "llama-judge-v2", "llama-judge-v3",
-                 "qwen-zero-shot",  "qwen-judge-v1",  "qwen-judge-v2",  "qwen-judge-v3"):
+    for name in all_pred_names:
         preds = load_predictions(name)
         if preds:
             preds_map[name] = preds
+    missing_preds = [n for n in all_pred_names if n not in preds_map]
+    if missing_preds:
+        print(f"Note: raw predictions unavailable locally, skipping in scatter/distribution plots: {missing_preds}")
 
     if preds_map:
-        plot_scatter(preds_map)
-        plot_score_dist_comparison(preds_map)
+        plot_scatter(preds_map, missing=missing_preds)
+        plot_score_dist_comparison(preds_map, missing=missing_preds)
 
     # tau report (version comparison + radar)
     tau_report_path = PRED_DIR / "tau_report.json"

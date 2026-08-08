@@ -146,6 +146,8 @@ python eval/predict.py \
 
 Both modes use a `DigitOnlyLogitsProcessor` that restricts generation to tokens `1`–`7`, preventing the model from continuing in the input language.
 
+Both modes also **quantize to 4-bit NF4 by default**, matching the precision `train.py` trains and dev-evaluates under (see Known Issues below). Pass `--full-precision` to load the model unquantized instead — mainly useful for deliberately comparing quantized vs. full-precision numbers.
+
 ### 5. Compute evaluation metrics
 
 ```bash
@@ -246,6 +248,32 @@ Both models use QLoRA (4-bit NF4) + LoRA. Key hyperparameters (v2):
 | Ranking accuracy | Pairwise ranking agreement across generator models (0.5 = random) |
 
 Zero-shot baselines (base model without fine-tuning) are included for comparison.
+
+## Version History & Known Issues
+
+Both models have gone through 3 training rounds so far. All logs/results are kept (`logs/*_v1/v2/v3_tau_log.json`, `eval/outputs/*-judge-v1/v2/v3.json`) for traceability — nothing has been overwritten.
+
+| Version | What changed | Status |
+|---------|-------------|--------|
+| v1 | Initial LoRA config (r=16, 5 epochs, lr=2e-4) | Baseline, superseded |
+| v2 | Tuned LoRA config for better generalization (higher rank/alpha, more target modules, 8 epochs, lower lr, more warmup) — see `train/configs/*.yaml` history | Best test-set result so far |
+| v3 | **Same config as v2** (only `output_dir` renamed). The actual change was in the *evaluation* code: `TauCallback.evaluate_tau` in `train/train.py` was switched from free-form generation (`max_new_tokens=4` + regex) to the same digit-only constrained decoding used by `eval/predict.py` (`max_new_tokens=1` + `DigitOnlyLogitsProcessor`), so training-time dev metrics would be measured the same way as the final test-set metrics. | See known issue below |
+
+### Known issue: v3's per-epoch dev τ log is unreliable
+
+`logs/llama_v3_tau_log.json` and `logs/qwen_v3_tau_log.json` show dev τ collapsing to near-zero/random from epoch 1 onward (e.g. llama: 0.02 vs. v2's 0.16; qwen: 0.01 vs. v2's 0.32; `naturalness` even goes negative). This looks like a training failure, **but it isn't** — `eval/predict.py` run on the same final `adapter_final` checkpoints gives normal, v2-comparable test τ (llama 0.114, qwen 0.097; see `eval/outputs/tau_report.json`).
+
+Leading hypothesis: a **quantization precision mismatch** between the two evaluation call sites.
+- `train/train.py`'s `TauCallback` calls `model.generate()` on the model **as loaded for training** — 4-bit NF4 quantized (`use_4bit: true` in the config).
+- `eval/predict.py` used to load the adapter **without quantization** by default.
+
+Once generation is hard-restricted to only 7 candidate tokens (digits 1–7), the choice becomes very sensitive to small logit differences — quantization noise is enough to flip the argmax during training-time eval, while a full-precision pass doesn't have that noise. This would explain why the *dev* curve looks broken but the *test* numbers don't.
+
+**Status: fixed, not yet re-verified.** The v3 `adapter_final` checkpoints were lost in a remote instance reset before this could be confirmed directly (re-running `predict.py` under quantization on the *same* v3 weights would have been the clean test). As of this commit, `eval/predict.py` now **quantizes by default** (4-bit NF4, matching `train.py`'s `TauCallback`) — pass `--full-precision` to opt out. This means:
+- Going forward, `TauCallback` and `predict.py` evaluate under the same precision, so a v4 dev-τ curve that stays healthy (instead of collapsing like v3's) would confirm the hypothesis.
+- The **existing** `eval/outputs/tau_report.json` numbers for zero-shot/v1/v2/v3 were all generated under the *old* full-precision default — they are not directly comparable to future quantized-default runs. Re-run `predict.py` (now quantized by default) on the still-available v1/v2 adapters if you need a like-for-like comparison against v4.
+
+**Practical takeaway for now**: trust `eval/outputs/tau_report.json` (test-set, from `predict.py`) over the `logs/*_v3_tau_log.json` per-epoch curves — the latter should not be used to judge whether v3 training "worked." A v4 run is planned now that `TauCallback` and `predict.py` evaluate under matching precision; v1–v3 artifacts stay untouched for comparison.
 
 ## Requirements
 

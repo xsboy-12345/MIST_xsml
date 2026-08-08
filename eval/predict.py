@@ -56,12 +56,18 @@ def main() -> None:
     parser.add_argument("--model-name", required=True, help="output filename (without extension)")
     parser.add_argument("--split",      default="test", choices=["dev", "test"])
     parser.add_argument("--limit",      type=int, default=None, help="only run inference on first N samples (for debugging)")
-    parser.add_argument("--use-4bit",   action="store_true")
+    parser.add_argument("--full-precision", action="store_true",
+                        help="disable 4-bit quantization (default: quantized, matching train.py's QLoRA setup). "
+                             "Use this only to deliberately compare against the quantized numbers — see README "
+                             "'Version History & Known Issues' for why the two must otherwise stay aligned.")
     args = parser.parse_args()
 
     # ── Load tokenizer + model ────────────────────────────────────────────────
+    # Quantized by default so eval precision matches train.py's TauCallback (both 4-bit NF4).
+    # A train/eval precision mismatch here previously caused v3's dev-tau log to look broken
+    # while predict.py's (then-unquantized) test results looked fine — see README known issues.
     bnb_cfg = None
-    if args.use_4bit:
+    if not args.full_precision:
         bnb_cfg = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_compute_dtype=torch.bfloat16,
